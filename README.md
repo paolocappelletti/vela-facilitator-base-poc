@@ -1,6 +1,6 @@
 # vela-facilitator-base-poc
 
-Standalone PoC for exercising the **Horizen VELA** dev stack deployed on **Base Sepolia** , 
+Standalone PoC for exercising a **Horizen VELA** dev stack deployed on **Base Sepolia** , 
 including the **vela-facilitator** (with the x402 private payment extension).
 
 ## Project structure
