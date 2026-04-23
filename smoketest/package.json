@@ -1,0 +1,22 @@
+{
+  "name": "vela-facilitator-base-test",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Standalone dev-smoke script for the vela-facilitator (uses published npm packages).",
+  "scripts": {
+    "dev:smoke": "tsx --env-file=.env src/dev-smoke.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@horizen/vela-common-ts": "0.1.0",
+    "@horizen/x402-private-vela-fixed": "0.0.6",
+    "@x402/core": "2.8.0",
+    "ethers": "6.13.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.4",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3"
+  }
+}
