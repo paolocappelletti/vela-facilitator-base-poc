@@ -28,7 +28,20 @@
  *   - Funder account funded with ETH (pays gas for the transfer tx) AND holding
  *     at least AMOUNT of the target ERC-20 token.
  *   - Facilitator account funded with ETH for gas.
- *   - Subgraph is running and indexing the processor. *
+ *   - Subgraph is running and indexing the processor.
+ *
+ * Env vars (all required — see .env.template for the Base Sepolia values):
+ *   FACILITATOR_URL              vela-facilitator HTTP endpoint
+ *   CHAIN_RPC_PROTOCOL           JSON-RPC protocol (http/https)
+ *   CHAIN_RPC_ADDRESS            JSON-RPC host
+ *   CHAIN_RPC_PORT               JSON-RPC port
+ *   CHAIN_PROCESSOR_ADDRESS      ProcessorEndpoint contract address
+ *   TEE_AUTHENTICATOR_ADDRESS    TeeAuthenticator contract address (TEE P-521 pubkey is read from it)
+ *   TOKEN_ADDRESS                ERC-20 (EIP-2612) token address
+ *   FUNDER_PRIVATE_KEY           must hold AMOUNT of the token and ETH for gas
+ *   APPLICATION_ID               vela-nova application id
+ *   SUBGRAPH_URL                 subgraph GraphQL endpoint
+ *   AMOUNT                       deposit/transfer/withdraw amount (smallest token unit)
  *
  * Run:
  *   pnpm dev:smoke
@@ -59,27 +72,13 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 // Config
 // ---------------------------------------------------------------------------
 
-function getEnv(name: string, def: string): string {
-  return process.env[name] ?? def;
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (v === undefined || v === "") {
+    throw new Error(`Missing required env var: ${name} (see .env.template)`);
+  }
+  return v;
 }
-
-// Dev defaults: match the vela dev stack (Anvil + vela/dockerfiles/.env.dev)
-const DEFAULTS = {
-  FACILITATOR_URL: "http://localhost:3000",
-  CHAIN_RPC_PROTOCOL: "http",
-  CHAIN_RPC_ADDRESS: "localhost",
-  CHAIN_RPC_PORT: "8545",
-  CHAIN_PROCESSOR_ADDRESS: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-  TEE_AUTHENTICATOR_ADDRESS: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-  // MockERC20 deployed by the vela deployer after the ProcessorEndpoint (deployer nonce=4)
-  TOKEN_ADDRESS: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-  // Anvil account #0 — must hold the token and pay gas for the transfer tx
-  FUNDER_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-  APPLICATION_ID: "9747039366101346037",
-  SUBGRAPH_URL: "http://localhost:8000/subgraphs/name/hcce",
-  // Deposit/transfer/withdraw amount (in smallest token unit, i.e. wei)
-  AMOUNT: "100",
-};
 
 const POLLING_INTERVAL_MS = 2_000;
 const POLLING_TIMEOUT_MS = 60_000;
@@ -188,18 +187,18 @@ function buildFacilitatorHelper(opts: {
 
 async function main() {
   // --- env --------------------------------------------------------------
-  const facilitatorUrl = getEnv("FACILITATOR_URL", DEFAULTS.FACILITATOR_URL);
-  const rpcProtocol = getEnv("CHAIN_RPC_PROTOCOL", DEFAULTS.CHAIN_RPC_PROTOCOL);
-  const rpcAddress = getEnv("CHAIN_RPC_ADDRESS", DEFAULTS.CHAIN_RPC_ADDRESS);
-  const rpcPort = getEnv("CHAIN_RPC_PORT", DEFAULTS.CHAIN_RPC_PORT);
+  const facilitatorUrl = requireEnv("FACILITATOR_URL");
+  const rpcProtocol = requireEnv("CHAIN_RPC_PROTOCOL");
+  const rpcAddress = requireEnv("CHAIN_RPC_ADDRESS");
+  const rpcPort = requireEnv("CHAIN_RPC_PORT");
   const rpcUrl = `${rpcProtocol}://${rpcAddress}:${rpcPort}`;
-  const contractAddress = getEnv("CHAIN_PROCESSOR_ADDRESS", DEFAULTS.CHAIN_PROCESSOR_ADDRESS);
-  const teeAuthenticatorAddress = getEnv("TEE_AUTHENTICATOR_ADDRESS", DEFAULTS.TEE_AUTHENTICATOR_ADDRESS);
-  const tokenAddress = getEnv("TOKEN_ADDRESS", DEFAULTS.TOKEN_ADDRESS);
-  const funderPrivateKey = getEnv("FUNDER_PRIVATE_KEY", DEFAULTS.FUNDER_PRIVATE_KEY);
-  const applicationId = BigInt(getEnv("APPLICATION_ID", DEFAULTS.APPLICATION_ID));
-  const subgraphUrl = getEnv("SUBGRAPH_URL", DEFAULTS.SUBGRAPH_URL);
-  const amount = BigInt(getEnv("AMOUNT", DEFAULTS.AMOUNT));
+  const contractAddress = requireEnv("CHAIN_PROCESSOR_ADDRESS");
+  const teeAuthenticatorAddress = requireEnv("TEE_AUTHENTICATOR_ADDRESS");
+  const tokenAddress = requireEnv("TOKEN_ADDRESS");
+  const funderPrivateKey = requireEnv("FUNDER_PRIVATE_KEY");
+  const applicationId = BigInt(requireEnv("APPLICATION_ID"));
+  const subgraphUrl = requireEnv("SUBGRAPH_URL");
+  const amount = BigInt(requireEnv("AMOUNT"));
 
 
   // --- infrastructure ---------------------------------------------------
@@ -249,24 +248,36 @@ async function main() {
   console.log(`AppId:       ${applicationId}`);
   console.log(`AMOUNT:    ${amount} (deposit/transfer/withdraw)`);
 
+  // --- preflight: funder must have ETH (gas) and >= AMOUNT of the token --
+  console.log(`\n[0] Preflight: funder balances`);
+  const [funderEthBal, funderTokenBal] = await Promise.all([
+    provider.getBalance(funder.address),
+    tokenReader.balanceOf(funder.address) as Promise<bigint>,
+  ]);
+  console.log(`    ETH:   ${ethers.formatEther(funderEthBal)}`);
+  console.log(`    Token: ${funderTokenBal}`);
+  if (funderEthBal === 0n) {
+    throw new Error(
+      `Funder ${funder.address} has 0 ETH — cannot pay gas. Fund it with ETH before running.`,
+    );
+  }
+  if (funderTokenBal < amount) {
+    throw new Error(
+      `Funder ${funder.address} has insufficient token balance: ${funderTokenBal} < ${amount}. ` +
+      `Fund it with at least ${amount} of ${tokenAddress} before running.`,
+    );
+  }
+
   // --- sanity: /supported ------------------------------------------------
-  console.log(`\n[0] GET /supported`);
+  console.log(`\n[1] GET /supported`);
   const supported = await buyerClient.supported();
   if (supported.status !== 200) {
     throw new Error(`GET /supported failed: ${supported.status} ${JSON.stringify(supported.body)}`);
   }
   console.log(`    -> ${JSON.stringify(supported.body)}`);
 
-  // --- step 1: funder transfers AMOUNT tokens to the buyer --------------
-  // The funder must already hold at least AMOUNT of the token.
-  console.log(`\n[1] Funder transfer -> Buyer (${amount} tokens)`);
-  const funderBal: bigint = await tokenReader.balanceOf(funder.address);
-  if (funderBal < amount) {
-    throw new Error(
-      `Funder ${funder.address} has insufficient token balance: ${funderBal} < ${amount}. ` +
-      `Fund it with at least ${amount} of ${tokenAddress} before running.`,
-    );
-  }
+  // --- step 2: funder transfers AMOUNT tokens to the buyer --------------
+  console.log(`\n[2] Funder transfer -> Buyer (${amount} tokens)`);
   const transferTx = await tokenAsFunder.transfer(buyerWallet.address, amount);
   await transferTx.wait();
   console.log(`    tx: ${transferTx.hash}`);
@@ -276,13 +287,13 @@ async function main() {
   console.log(`    buyer balance:  ${buyerBalInitial}`);
   console.log(`    seller balance: ${sellerBalInitial}`);
 
-  // --- step 2: ASSOCIATEKEY for buyer & seller --------------------------
-  console.log(`\n[2] ASSOCIATEKEY (buyer + seller)`);
+  // --- step 3: ASSOCIATEKEY for buyer & seller --------------------------
+  console.log(`\n[3] ASSOCIATEKEY (buyer + seller)`);
   await associateKey(buyerClient, funderVelaClient, provider, buyerKeyPair.publicKey, applicationId, "buyer");
   await associateKey(sellerClient, funderVelaClient, provider, sellerKeyPair.publicKey, applicationId, "seller");
 
-  // --- step 3: Buyer deposits AMOUNT ----------------------------------
-  console.log(`\n[3] Buyer DEPOSIT ${amount} tokens`);
+  // --- step 4: Buyer deposits AMOUNT ----------------------------------
+  console.log(`\n[4] Buyer DEPOSIT ${amount} tokens`);
   const depositRes = await buyerClient.submit({
     requestType: REQUEST_TYPE_PROCESS,
     payload: new Uint8Array(0), // deposit has an empty payload
@@ -298,13 +309,13 @@ async function main() {
   await waitForRequestCompleted(funderVelaClient, provider, depositReqId, "DEPOSIT");
   console.log(`    deposit completed.`);
 
-  // --- step 4: x402 transfer Buyer -> Seller ----------------------------
+  // --- step 5: x402 transfer Buyer -> Seller ----------------------------
   // Buyer uses the standard x402Client.createPaymentPayload() with our
   // registered scheme — no custom wrapper. The seller uses its own
   // HTTPFacilitatorClient, wrapped by VerifyingFacilitatorClient so that
   // settle() only returns success=true once the TEE has processed the request
   // AND the decrypted transfer_received event matches the PaymentRequirements.
-  console.log(`\n[4] x402 TRANSFER Buyer -> Seller (${amount} tokens)`);
+  console.log(`\n[5] x402 TRANSFER Buyer -> Seller (${amount} tokens)`);
   const network = `eip155:${chainId}` as `${string}:${string}`;
   const requirements: PaymentRequirements = {
     scheme: "private-vela-fixed",
@@ -317,7 +328,7 @@ async function main() {
   };
 
   // Buyer-side: standard x402Client + registered scheme. skipOnchainDeposit=true
-  // because the buyer already deposited in step [3] — this is a pure private-state
+  // because the buyer already deposited in step [4] — this is a pure private-state
   // transfer (assetAmount=0 on-chain, no permit).
   const buyerX402 = new x402Client();
   await registerPrivateVelaFixedClient(buyerX402, {
@@ -359,8 +370,8 @@ async function main() {
   console.log(`    /settle + TEE confirmation OK.`);
   console.log(`      requestId=${settleExt?.requestId} eventSubType=${settleExt?.eventSubType}`);
 
-  // --- step 5: Seller withdraws AMOUNT --------------------------------
-  console.log(`\n[5] Seller WITHDRAW ${amount} tokens`);
+  // --- step 6: Seller withdraws AMOUNT --------------------------------
+  console.log(`\n[6] Seller WITHDRAW ${amount} tokens`);
   const withdrawPayload = await sellerClient.buildWithdrawPayload({
     to: sellerWallet.address,
     amount: amount.toString(),
@@ -380,11 +391,11 @@ async function main() {
   await waitForRequestCompleted(funderVelaClient, provider, withdrawReqId, "WITHDRAW");
   console.log(`    withdraw completed.`);
 
-  // --- step 6: Seller CLAIM pending balance ----------------------------
+  // --- step 7: Seller CLAIM pending balance ----------------------------
   // The withdraw puts tokens in `pendingClaims[token][seller]` on-chain; the seller must
   // call claim() to move them into its wallet. Anyone can trigger it (funds always go to
   // the seller), so we use the facilitator's permissionless /claim endpoint.
-  console.log(`\n[6] Seller CLAIM pending balance`);
+  console.log(`\n[7] Seller CLAIM pending balance`);
   const claimRes = await sellerClient.claim({ tokenAddress, payee: sellerWallet.address });
   if (claimRes.status !== 200) {
     throw new Error(`/claim failed: ${claimRes.status} ${JSON.stringify(claimRes.body)}`);
@@ -398,8 +409,8 @@ async function main() {
     );
   }
 
-  // --- step 7: verify seller's on-chain balance ------------------------
-  console.log(`\n[7] Verify seller balance`);
+  // --- step 8: verify seller's on-chain balance ------------------------
+  console.log(`\n[8] Verify seller balance`);
   const sellerBalFinal: bigint = await tokenReader.balanceOf(sellerWallet.address);
   console.log(`    seller on-chain balance: ${sellerBalInitial} -> ${sellerBalFinal}`);
   if (sellerBalFinal !== sellerBalInitial + amount) {
@@ -420,7 +431,7 @@ async function main() {
   // Instead, we pull all events for the applicationId and let decryption drop
   // the ones not intended for the seller. The logical type is then read from
   // the JSON body (the `type` field below).
-  console.log(`\n[8] Decrypt seller's events via subgraph`);
+  console.log(`\n[9] Decrypt seller's events via subgraph`);
   const subgraph = createSubgraphClient(subgraphUrl);
   const sellerDecrypted = await fetchAndDecryptUserEvents(
     subgraph,
