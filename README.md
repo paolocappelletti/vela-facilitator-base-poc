@@ -1,7 +1,8 @@
 # vela-facilitator-base-poc
 
 Standalone PoC for exercising the **vela-facilitator** against the vela dev stack
-deployed on **Base Sepolia**, using only published npm packages.
+deployed on **Base Sepolia** (including the x402 private payment extension), 
+using only published npm packages.
 
 ## Layout
 
