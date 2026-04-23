@@ -3,7 +3,7 @@
 ```bash
 cd smoketest
 cp .env.template .env
-# edit .env and set FUNDER_PRIVATE_KEY to the private key of an address
+# edit .env and set FUNDER_PRIVATE_KEY to the private key of a BASE Sepolia address
 # that holds both USDC (Base Sepolia) and some ETH for gas
 pnpm install
 pnpm dev:smoke
