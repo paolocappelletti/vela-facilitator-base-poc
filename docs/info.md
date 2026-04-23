@@ -1,10 +1,13 @@
 # Base Sepolia — VELA dev stack reference
 
 ## Environment info
-| Network: | Base Sepolia Testnet |
-| vela version: | 0.1.0 |  
-| vela-facilitator version: | 0.1.0 |
-| vela-facilitator endpoint |http://34.246.94.215:3000/ |
+
+| Key | Value |
+| --- | --- |
+| Network | Base Sepolia Testnet |
+| vela version | 0.1.0 |
+| vela-facilitator version | 0.1.0 |
+| vela-facilitator endpoint | http://34.246.94.215:3000/ |
 | Subgraph | https://api.goldsky.com/api/public/project_cml7x1bnbintv01xu7tih85gl/subgraphs/vela-base-sepolia/0.1.0/gn |
 
 ## Deployed contracts
