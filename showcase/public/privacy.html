@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Full privacy — VaultPay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Azeret+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark">◈</span>
+          <span class="brand-name">VaultPay</span>
+        </a>
+        <nav class="nav-links">
+          <a href="/how">How it Works</a>
+          <a href="/privacy" class="is-active">Full privacy</a>
+          <!--a href="/demo">See it in Action</a>
+          <a href="/compare">Comparison with x402</a -->
+        </nav>
+      </div>
+    </header>
+
+    <main class="privacy-page">
+      <!-- ================================================== intro ======== -->
+      <section class="privacy-intro">
+        <div class="container">
+          <p class="eyebrow">Full privacy</p>
+          <h1 class="privacy-title">
+            Private at <span class="accent">every hop</span>
+          </h1>
+          <p class="privacy-lead">
+            Every clear-text payload travels inside an HTTPS tunnel, so no
+            outside observer can read it. Only the already-encrypted
+            <code>velaPayload</code> ever reaches the public chain it discloses nothing.
+          </p>
+        </div>
+      </section>
+
+      <!-- ================================================== stage ======== -->
+      <section class="privacy-stage-wrap">
+        <div class="container">
+          <div class="stage-scroll">
+            <div class="stage">
+              <!-- top row: Buyer ─ Seller ─ Facilitator -->
+              <div class="actor buyer">
+                <div class="actor-icon">👤</div>
+                <div class="actor-label">Buyer</div>
+              </div>
+
+              <div class="wire horizontal tunnel w1" data-label="HTTPS tunnel">
+                <div class="packet p1 clear">402 + x402 invoice</div>
+                <div class="packet p2 mixed">
+                  paymentPayload
+                  <span class="enc">velaPayload 🔒</span>
+                </div>
+              </div>
+
+              <div class="actor seller">
+                <div class="actor-icon">🛒</div>
+                <div class="actor-label">Seller</div>
+              </div>
+
+              <div class="wire horizontal tunnel w2" data-label="HTTPS tunnel">
+                <div class="packet p3 mixed">
+                  paymentPayload
+                  <span class="enc">velaPayload 🔒</span>
+                </div>
+              </div>
+
+              <div class="actor facilitator">
+                <div class="actor-icon">🛰️</div>
+                <div class="actor-label">Vela&nbsp;Facilitator</div>
+              </div>
+
+              <!-- vertical descent under the facilitator -->
+              <div class="wire vertical public w3" data-label="public mempool">
+                <div class="packet p4 encrypted">velaPayload 🔒</div>
+              </div>
+
+              <div class="actor chain">
+                <div class="actor-icon">⛓️</div>
+                <div class="actor-label">Base chain</div>
+              </div>
+
+              <div class="wire vertical internal w4" data-label="on-chain dispatch">
+                <div class="packet p5 encrypted">velaPayload 🔒</div>
+              </div>
+
+              <div class="actor tee">
+                <div class="actor-icon">🔐</div>
+                <div class="actor-label">Vela&nbsp;TEE</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-legend">
+            <span class="legend-item">
+              <span class="swatch swatch-tunnel"></span>
+              HTTPS tunnel — clear inside, opaque outside
+            </span>
+            <span class="legend-item">
+              <span class="swatch swatch-public"></span>
+              Public channel — only ciphertext crosses it
+            </span>
+            <span class="legend-item">
+              <span class="swatch swatch-encrypted"></span>
+              Encrypted <code>velaPayload</code> (decrypted only inside the TEE)
+            </span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span class="brand-name">VaultPay</span>
+        <span class="footer-meta">
+          Built with
+          <a href="https://www.horizenlabs.io/">Horizen Labs</a>
+          · Horizen Vela
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
