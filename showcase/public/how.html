@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How it Works — VaultPay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Azeret+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark">◈</span>
+          <span class="brand-name">VaultPay</span>
+        </a>
+        <nav class="nav-links">
+          <a href="/how" class="is-active">How it Works</a>
+          <!--a href="/demo">See it in Action</a>
+          <a href="/compare">Comparison with x402</a -->
+        </nav>
+      </div>
+    </header>
+
+    <main class="how-page">
+      <!-- =========================================================== title -->
+      <section class="how-intro">
+        <div class="container how-intro-inner">
+          <p class="eyebrow">How it Works</p>
+          <h1 class="how-title">
+            A private X402 payment, <span class="accent">step by step</span>
+          </h1>
+          <p class="how-lead">
+            Walk through the end-to-end flow of a private payment between
+            buyer and seller on Base, executed inside the Horizen Vela TEE.
+          </p>
+          <a class="step-next" href="#step-1">Start ↓</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 1 -->
+      <section id="step-1" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 1 · Preliminary</div>
+          <h2 class="step-title">Buyer &amp; seller register their keys</h2>
+          <p class="step-desc">
+            Both buyer and seller register their Base address to the Vela
+            system by signing and sending a payload. In the example below
+            they use the <code>FacilitatorHelper</code> — <strong>no ETH
+            needed</strong>. Alternatively, they can use the Vela TypeScript
+            library and call the Vela endpoint contract on Base directly.
+          </p>
+          <pre class="code-block"><code>import { FacilitatorHelper } from "@horizen/x402-private-vela-fixed";
+
+const helper = new FacilitatorHelper(facilitatorUrl, privateKeys);
+const res = await helper.submit({
+  requestType: REQUEST_TYPE_ASSOCIATEKEY,
+  payload: buildPayload(publicKey),
+  assetAmount: 0n,
+  applicationId,
+});</code></pre>
+          <a class="step-next" href="#step-2">Continue → Step 2</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 2 -->
+      <section id="step-2" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 2 · Deposit</div>
+          <h2 class="step-title">The buyer deposits USDC into a private wallet</h2>
+          <p class="step-desc">
+            The buyer moves USDC from their public Base balance into a
+            Vela-managed private account. Just like the previous step, this
+            can be done by signing and sending a payload to the facilitator
+            (no ETH needed) or with the Vela TypeScript library directly.
+          </p>
+          <pre class="code-block"><code>import { FacilitatorHelper } from "@horizen/x402-private-vela-fixed";
+
+const helper = new FacilitatorHelper(facilitatorUrl, privateKeys);
+const res = await helper.submit({
+  requestType: REQUEST_TYPE_PROCESS,
+  payload: new Uint8Array(0), // deposit has an empty payload
+  tokenAddress,
+  assetAmount: amount,
+  applicationId,
+});</code></pre>
+          <a class="step-next" href="#step-3">Continue → Step 3</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 3 -->
+      <section id="step-3" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 3 · x402 invoice</div>
+          <h2 class="step-title">The seller protects an endpoint with x402</h2>
+          <p class="step-desc">
+            The seller responds to the buyer's HTTP request with a standard
+            x402 <code>402 Payment Required</code>. The JSON shape is
+            identical to the Coinbase x402 spec, with only two
+            VaultPay-specific additions:
+          </p>
+          <ul class="step-list">
+            <li><code>scheme: "private-vela-fixed"</code></li>
+            <li>
+              an extra <code>invoiceId</code> field — a unique string the
+              seller generates in any format they like
+            </li>
+          </ul>
+          <pre class="code-block"><code>// requirementsPayload comes from the seller's 402 response.
+const requirementsPayload = {
+  x402Version: 2,
+  resource: { url: "http://resource-asked..." },
+  accepts: [
+    {
+      <span class="hl-yellow">scheme: "private-vela-fixed"</span>,
+      network,
+      asset: tokenAddress,
+      amount: 100000,
+      payTo: "0xsellerAddress",
+      maxTimeoutSeconds: 60,
+      extra: { <span class="hl-yellow">invoiceId: "INVOICEID_XXXXX"</span> },
+    },
+  ],
+};</code></pre>
+          <a class="step-next" href="#step-4">Continue → Step 4</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 4 -->
+      <section id="step-4" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 4 · Payment payload</div>
+          <h2 class="step-title">The buyer builds an encrypted paymentPayload</h2>
+          <p class="step-desc">
+            The buyer uses the standard <code>x402Client()</code> from
+            Coinbase, extended with the VaultPay Vela plugin, to build an
+            encrypted <code>paymentPayload</code> that carries everything
+            needed to execute the payment inside the TEE. The
+            <code>requirementsPayload</code> passed in is exactly the one
+            received from the seller.
+          </p>
+          <pre class="code-block"><code>import { x402Client } from "@x402/core/client"; 
+import {registerPrivateVelaFixedClient} from "@horizen/x402-private-vela-fixed";
+
+const buyerX402 = new x402Client();
+await registerPrivateVelaFixedClient(buyerX402, { velaRpcUrl, privateKeys... });
+
+const requirementsPayload: PaymentRequired = {
+  x402Version: 2,
+  resource: { url: "http://resource-asked..." },
+  accepts: [requirementsPayload],
+};
+const paymentPayload = await buyerX402.createPaymentPayload(requirementsPayload);</code></pre>
+          <a class="step-next" href="#step-5">Continue → Step 5</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 5 -->
+      <section id="step-5" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 5 · Verify &amp; settle</div>
+          <h2 class="step-title">The seller settles via the Vela facilitator</h2>
+          <p class="step-desc">
+            The <code>paymentPayload</code> is delivered to the seller, who
+            calls the Vela facilitator. He can use the standard
+            <code>HTTPFacilitatorClient</code> from Coinbase — the Vela
+            facilitator is 100% compatible with the standard API, <strong>no change
+            required</strong>. If settlement succeeds, the payment has been
+            completed inside the Vela TEE and the seller can serve the
+            resource.
+          </p>
+          <pre class="code-block"><code>import { HTTPFacilitatorClient } from "@x402/core/server";
+
+const sellerFacilitator = new HTTPFacilitatorClient({ url: facilitatorUrl });
+
+const verifyResult = await sellerFacilitator.verify(paymentPayload, requirements);
+if (!verifyResult.isValid) {
+  throw new Error(`/verify failed! ${verifyResult.invalidReason}`,
+  );
+}
+
+const settleResult = await sellerFacilitator.settle(paymentPayload, requirements);
+if (!settleResult.success) {
+  throw new Error(`/settle failed: ${settleResult.errorReason}`,
+  );
+}
+
+//serve...
+</code></pre>
+          <a class="step-next" href="#step-6">Continue → Step 6</a>
+        </div>
+      </section>
+
+      <!-- ============================================================== 6 -->
+      <section id="step-6" class="step-block">
+        <div class="container step-inner">
+          <div class="step-badge">Step 6 · Withdraw</div>
+          <h2 class="step-title">The seller withdraws funds when ready</h2>
+          <p class="step-desc">
+            At any time, the seller can withdraw funds from the private
+            wallet back to their public Base balance — again either via the
+            facilitator (no ETH needed) or by calling the Vela endpoint
+            contract directly with the TypeScript library.
+          </p>
+          <div class="step-cta">
+            <a class="btn btn-ghost" href="#top">Back to top ↑</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span class="brand-name">VaultPay</span>
+        <span class="footer-meta">
+          Built with
+          <a href="https://www.horizenlabs.io/">Horizen Labs</a>
+          · Horizen Vela
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

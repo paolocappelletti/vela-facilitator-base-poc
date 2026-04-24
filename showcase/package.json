@@ -1,0 +1,14 @@
+{
+  "name": "vela-facilitator-base-showcase",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Showcase webapp demoing the vela-facilitator (x402 private payments on Base Sepolia).",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  }
+}

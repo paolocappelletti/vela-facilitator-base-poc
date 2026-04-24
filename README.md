@@ -16,6 +16,10 @@ and x402 private payments).
   verify/settle via x402 → withdraw → claim <br/>
   See [`smoketest/README.md`](./smoketest/README.md) for details.
 
+- [`showcase/`](./showcase) <br/>
+  Node.js webapp (Express) hosting a web interactive description of the process.
+  See [`showcase/README.md`](./showcase/README.md) for details.
+
 
 
 
