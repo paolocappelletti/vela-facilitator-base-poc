@@ -20,6 +20,6 @@ Override the port with `PORT=4000 pnpm start`.
 
 - `server.js` — tiny Express server serving `public/`
 - `public/index.html` — homepage
-- `public/index.html` — step by step explanation of how the system works
+- `public/how.html` — step by step explanation of how the system works
 - `public/privacy.html` — privacy diagram
 - `public/styles.css` — styles (Horizen Labs palette)
